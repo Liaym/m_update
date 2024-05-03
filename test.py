@@ -8,7 +8,7 @@ def upload_test_file():
         os.getenv("minio.lab.sspcloud.fr"),
         access_key=os.getenv("MINIO_ACCESS_KEY_ID"),
         secret_key=os.getenv("MINIO_SECRET_ACCESS_KEY"),
-        session_token=os.getenv("MINIO_SESSION_TOKEN")
+        session_token=os.getenv("MINIO_SESSION_TOKEN"),
         secure=True
     )
     
