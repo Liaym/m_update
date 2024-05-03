@@ -28,4 +28,4 @@ jobs:
         MINIO_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY_ID }}
         MINIO_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
         MINIO_SESSION_TOKEN: ${{ secrets.MINIO_SESSION_TOKEN }}
-      run: python update_minio.py
+      run: python test.py
