@@ -2,7 +2,7 @@ name: Update MinIO File
 
 on:
   schedule:
-    - cron: '40 1 * * *'  
+    - cron: '43 23 * * *'  
 
 jobs:
   update-file:
