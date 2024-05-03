@@ -1,0 +1,31 @@
+name: Update MinIO File
+
+on:
+  schedule:
+    - cron: '40 1 * * *'  
+
+jobs:
+  update-file:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        pip install minio
+        pip install pandas
+        pip install tqdm
+
+    - name: Run Update Script
+      env:
+        MINIO_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY_ID }}
+        MINIO_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
+        MINIO_SESSION_TOKEN: ${{ secrets.MINIO_SESSION_TOKEN }}
+      run: python update_minio.py
