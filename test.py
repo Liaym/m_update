@@ -1,11 +1,12 @@
 import os
 from minio import Minio
+import io
 from minio.error import S3Error
 
 def upload_test_file():
     # Initialize Minio client with credentials
     client = Minio(
-        os.getenv("minio.lab.sspcloud.fr"),
+        "minio.lab.sspcloud.fr",
         access_key=os.getenv("MINIO_ACCESS_KEY_ID"),
         secret_key=os.getenv("MINIO_SECRET_ACCESS_KEY"),
         session_token=os.getenv("MINIO_SESSION_TOKEN"),
