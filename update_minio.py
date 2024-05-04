@@ -73,6 +73,25 @@ def process_movie_ids(movie_id: int, client: Minio, pbar: tqdm) -> None:
     )
     logging.info(f"Processed and uploaded data for movie ID {movie_id}")
     pbar.update(1)
+    
+def process_movie_data(movie_data):
+    """
+    Ensure all data is in string format and handle null values.
+    """
+    # Assuming 'genres' might be a list of dictionaries, we extract genre names as a comma-separated string.
+    if 'genres' in movie_data and isinstance(movie_data['genres'], list):
+        movie_data['genres'] = ", ".join([genre['name'] for genre in movie_data['genres'] if 'name' in genre])
+
+    # Convert all fields to string and handle None types
+    for key, value in movie_data.items():
+        if isinstance(value, list):  # If any other field is a list of dicts, handle similarly
+            movie_data[key] = ", ".join([str(v) for v in value])
+        elif value is None:
+            movie_data[key] = None  # Or convert None to a string or a default value as required
+        else:
+            movie_data[key] = str(value)
+
+    return movie_data
 
 def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
     """ Combine all individual movie data files into one and upload to MinIO """
@@ -89,14 +108,20 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
 
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
     """ Load the original dataset, update it with new data, and save back to MinIO """
-    original_data = pd.read_parquet(io.BytesIO(client.get_object(MINIO_BUCKET, original_file).data))
-    update_data = pd.read_json(io.BytesIO(client.get_object(MINIO_BUCKET, update_file).data))
-    updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
-    buffer = io.BytesIO()
-    updated_df.to_parquet(buffer, index=False)
-    client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
-    logging.info("Dataset updated and saved back to MinIO")
-
+    try:
+        original_data = pd.read_parquet(io.BytesIO(client.get_object(MINIO_BUCKET, original_file).data))
+        update_data = pd.read_json(io.BytesIO(client.get_object(MINIO_BUCKET, update_file).data))
+        
+        # Process each row to ensure data types are correct
+        update_data = update_data.apply(process_movie_data, axis=1)
+        
+        updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
+        buffer = io.BytesIO()
+        updated_df.to_parquet(buffer, index=False)
+        client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
+        logging.info("Dataset updated and saved back to MinIO")
+    except Exception as e:
+        logging.error(f"Error updating dataset: {e}")
 def executor():
     """ Main executor function """
     dataset_df = pd.read_parquet(f'https://{MINIO_SERVER}/{MINIO_BUCKET}/diffusion/TMDB_movies.parquet')
