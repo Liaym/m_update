@@ -21,6 +21,7 @@ jobs:
         pip install pandas
         pip install tqdm
         pip install requests
+        pip install fastparquet
 
     - name: Run Update Script
       env:
