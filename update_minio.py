@@ -107,23 +107,20 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
     logging.info("Combined data uploaded to MinIO")
 
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
-    try:
-        response = client.get_object(MINIO_BUCKET, original_file)
-        original_data = pd.read_parquet(io.BytesIO(response.data))
+    response = client.get_object(MINIO_BUCKET, original_file)
+    original_data = pd.read_parquet(io.BytesIO(response.data))
 
-        response = client.get_object(MINIO_BUCKET, update_file)
-        update_data = pd.read_json(io.BytesIO(response.data))
+    response = client.get_object(MINIO_BUCKET, update_file)
+    update_data = pd.read_json(io.BytesIO(response.data))
 
-        update_data = update_data.apply(process_movie_data, axis=1)
-        updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
+    update_data = update_data.apply(process_movie_data, axis=1)
+    updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
 
-        buffer = io.BytesIO()
-        updated_df.to_parquet(buffer, index=False)
-        buffer.seek(0)  # Rewind the buffer after writing
-        client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=len(buffer.getvalue()))
-        logging.info("Dataset updated and saved back to MinIO")
-    except Exception as e:
-        logging.error(f"Error updating dataset: {e}")
+    buffer = io.BytesIO()
+    updated_df.to_parquet(buffer, index=False)
+    buffer.seek(0)  # Rewind the buffer after writing
+    client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=len(buffer.getvalue()))
+    logging.info("Dataset updated and saved back to MinIO")
 
 
 
