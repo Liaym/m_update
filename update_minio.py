@@ -109,28 +109,31 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
     """ Load the original dataset, update it with new data, and save back to MinIO """
     try:
+        # Load the original dataset
         response = client.get_object(MINIO_BUCKET, original_file)
-        with io.BytesIO(response.data) as data:
-            original_data = pd.read_parquet(data)
-        
+        original_data = pd.read_parquet(io.BytesIO(response.data))
+
+        # Load the new data
         response = client.get_object(MINIO_BUCKET, update_file)
-        with io.BytesIO(response.data) as data:
-            update_data = pd.read_json(data)
+        update_data = pd.read_json(io.BytesIO(response.data))
 
         # Process each row to ensure data types are correct
         update_data = update_data.apply(process_movie_data, axis=1)
         
+        # Combine the datasets and remove duplicates
         updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
-        
+
+        # Write the combined DataFrame to a BytesIO object and upload
         with io.BytesIO() as buffer:
             updated_df.to_parquet(buffer, index=False)
-            buffer.seek(0)  # Rewind the buffer
-            client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
+            buffer.seek(0)  # Make sure to rewind after writing
+            client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=len(buffer.getvalue()))
             logging.info("Dataset updated and saved back to MinIO")
     
     except Exception as e:
         logging.error(f"Error updating dataset: {e}")
 
+    
         
         
 def executor():
