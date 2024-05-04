@@ -1,8 +1,6 @@
 name: Update MinIO File
 
-on:
-  schedule:
-    - cron: '52 23 * * *'  
+on: workflow_dispatch
 
 jobs:
   update-file:
