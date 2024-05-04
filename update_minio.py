@@ -124,12 +124,14 @@ def load_and_update_dataset(client: Minio, original_file: str, update_file: str)
         updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
 
         # Write the combined DataFrame to a BytesIO object and upload
-        with io.BytesIO() as buffer:
-            updated_df.to_parquet(buffer, index=False)
-            buffer.seek(0)  # Make sure to rewind after writing
-            client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=len(buffer.getvalue()))
-            logging.info("Dataset updated and saved back to MinIO")
-    
+        buffer = io.BytesIO()
+        updated_df.to_parquet(buffer, index=False)
+        buffer.seek(0)  # Rewind the buffer after writing
+
+        client.put_object(MINIO_BUCKET, original_file, data=buffer, length=len(buffer.getvalue()))
+        buffer.close()  # Explicitly close the buffer after the upload
+        logging.info("Dataset updated and saved back to MinIO")
+
     except Exception as e:
         logging.error(f"Error updating dataset: {e}")
 
