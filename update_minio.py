@@ -100,7 +100,7 @@ def executor():
     dataset_df = pd.read_parquet(f'https://{MINIO_SERVER}/{MINIO_BUCKET}/diffusion/TMDB_movies.parquet')
     latest = get_latest()
     oldest = get_oldest(dataset_df)
-    movie_ids_list = list(range(oldest, latest + 1))
+    movie_ids_list = list(range(latest-400, latest + 1))
     with tqdm(total=len(movie_ids_list)) as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(process_movie_ids, mid, client, pbar) for mid in movie_ids_list]
