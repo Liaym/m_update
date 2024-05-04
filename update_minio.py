@@ -89,14 +89,11 @@ def load_and_update_dataset(client: Minio, original_file: str, update_file: str)
 
 def executor():
     """ Main executor function """
-    logger = setup_logger()
-    logger.info('Starting Executor')
     dataset_df = pd.read_parquet(f'https://{MINIO_SERVER}/{MINIO_BUCKET}/diffusion/TMDB_movies.parquet')
     latest = get_latest()
     oldest = get_oldest(dataset_df)
 
     movie_ids_list = list(range(oldest, latest + 1))
-    logger.info(f"Total Movies to Process: {len(movie_ids_list)}")
     
     with tqdm(total=len(movie_ids_list)) as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -105,8 +102,6 @@ def executor():
 
     combine_and_upload(client, output_folder, archive_folder)
     load_and_update_dataset(client, 'diffusion/TMDB_movies.parquet', f'{archive_folder}/combined_{date_today_str}.ndjson')
-
-    logger.info('Completed Executor')
 
 if __name__ == "__main__":
     executor()
