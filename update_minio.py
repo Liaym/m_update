@@ -107,27 +107,17 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
     logging.info("Combined data uploaded to MinIO")
 
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
-    """ Load the original dataset, update it with new data, and save back to MinIO with detailed logging. """
+    """ Load the original dataset, update it with new data, and save back to MinIO without using `with` block for buffer."""
     try:
         logging.info("Starting to load the original dataset.")
         response = client.get_object(MINIO_BUCKET, original_file)
-        if response.data:
-            logging.info("Original dataset loaded successfully.")
-        else:
-            logging.warning("Original dataset loaded but the data appears to be empty.")
-
         original_data = pd.read_parquet(io.BytesIO(response.data))
-        logging.info("Original dataset converted to DataFrame successfully.")
+        logging.info("Original dataset loaded and converted to DataFrame successfully.")
 
         logging.info("Starting to load the update data.")
         response = client.get_object(MINIO_BUCKET, update_file)
-        if response.data:
-            logging.info("Update data loaded successfully.")
-        else:
-            logging.warning("Update data loaded but the data appears to be empty.")
-
         update_data = pd.read_json(io.BytesIO(response.data))
-        logging.info("Update data converted to DataFrame successfully.")
+        logging.info("Update data loaded and converted to DataFrame successfully.")
 
         logging.info("Applying data transformations.")
         update_data = update_data.apply(process_movie_data, axis=1)
@@ -141,15 +131,13 @@ def load_and_update_dataset(client: Minio, original_file: str, update_file: str)
         buffer = io.BytesIO()
         updated_df.to_parquet(buffer, index=False)
         buffer.seek(0)  # Rewind the buffer after writing to ensure it's ready for reading
-        logging.info("Combined data written to buffer successfully. Preparing to upload.")
+        logging.info("Combined data written to buffer successfully.")
 
         client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.getbuffer().nbytes)
         logging.info("Dataset updated and saved back to MinIO successfully.")
     
     except Exception as e:
         logging.error(f"Error updating dataset: {e}", exc_info=True)
-
-
     
         
 def executor():
