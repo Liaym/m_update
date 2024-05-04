@@ -17,6 +17,7 @@ TMDB_KEY = os.getenv('TMDB_KEY')
 MINIO_SERVER = "minio.lab.sspcloud.fr"
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY_ID")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_ACCESS_KEY")
+MINIO_SESSION_TOKEN = os.getenv("MINIO_SESSION_TOKEN")
 MINIO_BUCKET = "alimane"
 
 # Initialize Minio client with credentials
@@ -24,6 +25,7 @@ client = Minio(
     MINIO_SERVER,
     access_key=MINIO_ACCESS_KEY,
     secret_key=MINIO_SECRET_KEY,
+    session_token=MINIO_SESSION_TOKEN,
     secure=True
 )
 
