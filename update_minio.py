@@ -7,6 +7,10 @@ from tqdm import tqdm
 import datetime
 import pandas as pd
 from minio import Minio
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Environment Variables
 TMDB_KEY = os.getenv('TMDB_KEY')
@@ -34,19 +38,25 @@ def get_latest() -> int:
     """ Fetch the latest movie ID from TMDB API """
     url = f"https://api.themoviedb.org/3/movie/latest?api_key={TMDB_KEY}"
     response = requests.get(url)
-    response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
-    return response.json()['id']
+    response.raise_for_status()
+    latest_id = response.json()['id']
+    logging.info(f"Latest movie ID fetched: {latest_id}")
+    return latest_id
 
 def get_oldest(dataset_df) -> int:
     """ Retrieve the oldest movie ID from the dataset """
-    return dataset_df['id'].min()
+    oldest_id = dataset_df['id'].min()
+    logging.info(f"Oldest movie ID: {oldest_id}")
+    return oldest_id
 
 def get_keywords(movie_id: int) -> dict:
     """ Fetch keywords for a movie from TMDB """
     url = f"https://api.themoviedb.org/3/movie/{movie_id}/keywords?api_key={TMDB_KEY}"
     response = requests.get(url)
     response.raise_for_status()
-    return response.json()
+    keywords_data = response.json()
+    logging.info(f"Keywords fetched for movie ID {movie_id}")
+    return keywords_data
 
 def process_movie_ids(movie_id: int, client: Minio, pbar: tqdm) -> None:
     """ Process each movie ID by fetching data and storing it in MinIO """
@@ -55,12 +65,11 @@ def process_movie_ids(movie_id: int, client: Minio, pbar: tqdm) -> None:
     response.raise_for_status()
     movie_data = response.json()
     movie_data['keywords'] = ", ".join([k['name'] for k in get_keywords(movie_id)['keywords']])
-
-    # Serialize and upload to MinIO
     object_name = f"{output_folder}scrapeTMDB_movies_{movie_id}.ndjson"
     client.put_object(
         MINIO_BUCKET, object_name, data=io.BytesIO(json.dumps(movie_data).encode('utf-8')), length=len(json.dumps(movie_data))
     )
+    logging.info(f"Processed and uploaded data for movie ID {movie_id}")
     pbar.update(1)
 
 def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
@@ -74,6 +83,7 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
         MINIO_BUCKET, f"{archive_folder}/combined_{date_today_str}.ndjson",
         data=io.BytesIO(json.dumps(combined_data).encode('utf-8')), length=len(json.dumps(combined_data))
     )
+    logging.info("Combined data uploaded to MinIO")
 
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
     """ Load the original dataset, update it with new data, and save back to MinIO """
@@ -83,20 +93,18 @@ def load_and_update_dataset(client: Minio, original_file: str, update_file: str)
     buffer = io.BytesIO()
     updated_df.to_parquet(buffer, index=False)
     client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
+    logging.info("Dataset updated and saved back to MinIO")
 
 def executor():
     """ Main executor function """
     dataset_df = pd.read_parquet(f'https://{MINIO_SERVER}/{MINIO_BUCKET}/diffusion/TMDB_movies.parquet')
     latest = get_latest()
     oldest = get_oldest(dataset_df)
-
     movie_ids_list = list(range(oldest, latest + 1))
-    
     with tqdm(total=len(movie_ids_list)) as pbar:
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(process_movie_ids, mid, client, pbar) for mid in movie_ids_list]
             concurrent.futures.wait(futures)
-
     combine_and_upload(client, output_folder, archive_folder)
     load_and_update_dataset(client, 'diffusion/TMDB_movies.parquet', f'{archive_folder}/combined_{date_today_str}.ndjson')
 
