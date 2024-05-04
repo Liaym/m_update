@@ -107,21 +107,47 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
     logging.info("Combined data uploaded to MinIO")
 
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
-    response = client.get_object(MINIO_BUCKET, original_file)
-    original_data = pd.read_parquet(io.BytesIO(response.data))
+    """ Load the original dataset, update it with new data, and save back to MinIO with detailed logging. """
+    try:
+        logging.info("Starting to load the original dataset.")
+        response = client.get_object(MINIO_BUCKET, original_file)
+        if response.data:
+            logging.info("Original dataset loaded successfully.")
+        else:
+            logging.warning("Original dataset loaded but the data appears to be empty.")
 
-    response = client.get_object(MINIO_BUCKET, update_file)
-    update_data = pd.read_json(io.BytesIO(response.data))
+        original_data = pd.read_parquet(io.BytesIO(response.data))
+        logging.info("Original dataset converted to DataFrame successfully.")
 
-    update_data = update_data.apply(process_movie_data, axis=1)
-    updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
+        logging.info("Starting to load the update data.")
+        response = client.get_object(MINIO_BUCKET, update_file)
+        if response.data:
+            logging.info("Update data loaded successfully.")
+        else:
+            logging.warning("Update data loaded but the data appears to be empty.")
 
-    buffer = io.BytesIO()
-    updated_df.to_parquet(buffer, index=False)
-    buffer.seek(0)  # Rewind the buffer after writing
-    client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=len(buffer.getvalue()))
-    logging.info("Dataset updated and saved back to MinIO")
+        update_data = pd.read_json(io.BytesIO(response.data))
+        logging.info("Update data converted to DataFrame successfully.")
 
+        logging.info("Applying data transformations.")
+        update_data = update_data.apply(process_movie_data, axis=1)
+        logging.info("Data transformations applied successfully.")
+
+        logging.info("Combining datasets.")
+        updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
+        logging.info(f"Datasets combined. Total records after merge: {len(updated_df)}.")
+
+        logging.info("Writing combined data to BytesIO object for upload.")
+        buffer = io.BytesIO()
+        updated_df.to_parquet(buffer, index=False)
+        buffer.seek(0)  # Rewind the buffer after writing to ensure it's ready for reading
+        logging.info("Combined data written to buffer successfully. Preparing to upload.")
+
+        client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.getbuffer().nbytes)
+        logging.info("Dataset updated and saved back to MinIO successfully.")
+    
+    except Exception as e:
+        logging.error(f"Error updating dataset: {e}", exc_info=True)
 
 
     
