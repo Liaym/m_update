@@ -32,9 +32,8 @@ json_save_object_name = f"{archive_folder}/{date_today_str}_TMDB_movies.ndjson"
 
 def get_latest() -> int:
     """ Fetch the latest movie ID from TMDB API """
-    url = "https://api.themoviedb.org/3/movie/latest"
-    headers = {"accept": "application/json", "Authorization": f"Bearer {TMDB_KEY}"}
-    response = requests.get(url, headers=headers)
+    url = f"https://api.themoviedb.org/3/movie/latest?api_key={TMDB_KEY}"
+    response = requests.get(url)
     response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
     return response.json()['id']
 
@@ -44,17 +43,15 @@ def get_oldest(dataset_df) -> int:
 
 def get_keywords(movie_id: int) -> dict:
     """ Fetch keywords for a movie from TMDB """
-    url = f"https://api.themoviedb.org/3/movie/{movie_id}/keywords"
-    headers = {"accept": "application/json", "Authorization": f"Bearer {TMDB_KEY}"}
-    response = requests.get(url, headers=headers)
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}/keywords?api_key={TMDB_KEY}"
+    response = requests.get(url)
     response.raise_for_status()
     return response.json()
 
 def process_movie_ids(movie_id: int, client: Minio, pbar: tqdm) -> None:
     """ Process each movie ID by fetching data and storing it in MinIO """
-    url = f"https://api.themoviedb.org/3/movie/{movie_id}?language=en-US"
-    headers = {"accept": "application/json", "Authorization": f"Bearer {TMDB_KEY}"}
-    response = requests.get(url, headers=headers)
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={TMDB_KEY}&language=en-US"
+    response = requests.get(url)
     response.raise_for_status()
     movie_data = response.json()
     movie_data['keywords'] = ", ".join([k['name'] for k in get_keywords(movie_id)['keywords']])
