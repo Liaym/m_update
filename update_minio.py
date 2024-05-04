@@ -109,19 +109,30 @@ def combine_and_upload(client: Minio, output_folder: str, archive_folder: str):
 def load_and_update_dataset(client: Minio, original_file: str, update_file: str):
     """ Load the original dataset, update it with new data, and save back to MinIO """
     try:
-        original_data = pd.read_parquet(io.BytesIO(client.get_object(MINIO_BUCKET, original_file).data))
-        update_data = pd.read_json(io.BytesIO(client.get_object(MINIO_BUCKET, update_file).data))
+        response = client.get_object(MINIO_BUCKET, original_file)
+        with io.BytesIO(response.data) as data:
+            original_data = pd.read_parquet(data)
         
+        response = client.get_object(MINIO_BUCKET, update_file)
+        with io.BytesIO(response.data) as data:
+            update_data = pd.read_json(data)
+
         # Process each row to ensure data types are correct
         update_data = update_data.apply(process_movie_data, axis=1)
         
         updated_df = pd.concat([original_data, update_data]).drop_duplicates(subset='id').reset_index(drop=True)
-        buffer = io.BytesIO()
-        updated_df.to_parquet(buffer, index=False)
-        client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
-        logging.info("Dataset updated and saved back to MinIO")
+        
+        with io.BytesIO() as buffer:
+            updated_df.to_parquet(buffer, index=False)
+            buffer.seek(0)  # Rewind the buffer
+            client.put_object(MINIO_BUCKET, original_file, data=buffer.getvalue(), length=buffer.tell())
+            logging.info("Dataset updated and saved back to MinIO")
+    
     except Exception as e:
         logging.error(f"Error updating dataset: {e}")
+
+        
+        
 def executor():
     """ Main executor function """
     dataset_df = pd.read_parquet(f'https://{MINIO_SERVER}/{MINIO_BUCKET}/diffusion/TMDB_movies.parquet')
